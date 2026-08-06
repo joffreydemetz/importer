@@ -1,0 +1,37 @@
+{
+    "name": "jdz/importer",
+    "type": "library",
+    "description": "Spreadsheet import (xlsx / csv / ods) on top of PhpSpreadsheet",
+    "keywords": ["JDZ", "import", "spreadsheet", "xlsx", "csv"],
+    "homepage": "https://jdz.joffreydemetz.com/importer",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Joffrey Demetz",
+            "email": "joffrey.demetz@gmail.com",
+            "homepage": "https://joffreydemetz.com",
+            "role": "Lead"
+        }
+    ],
+    "require": {
+        "php": ">=8.2",
+        "phpoffice/phpspreadsheet": "^4.1 || ^5.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "JDZ\\Importer\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "JDZ\\Importer\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit --colors=always --testdox",
+        "test-coverage": "phpunit --coverage-html coverage"
+    }
+}
