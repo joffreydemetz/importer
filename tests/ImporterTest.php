@@ -10,13 +10,12 @@
 namespace JDZ\Importer\Tests;
 
 use JDZ\Importer\Importer;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PHPUnit\Framework\TestCase;
 
-/**
- * @covers \JDZ\Importer\Importer
- */
+#[CoversClass(Importer::class)]
 class ImporterTest extends TestCase
 {
     /** @var string[] */
