@@ -11,6 +11,7 @@ namespace JDZ\Importer;
 
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Shared\Date;
 
 /**
  * Spreadsheet importer — reads the active worksheet into an array of
@@ -29,7 +30,8 @@ class Importer
   public function parse(string $tmpfile): array
   {
     $spreadsheet = IOFactory::load($tmpfile);
-    $data = $spreadsheet->getActiveSheet()->toArray(null, true, true, true);
+    $sheet = $spreadsheet->getActiveSheet();
+    $data = $sheet->toArray(null, true, true, true);
 
     $rows = [];
 
@@ -37,7 +39,9 @@ class Importer
       return $rows;
     }
 
-    $_columns = array_shift($data);
+    // rows stay keyed by their sheet row number (array_shift() would renumber them)
+    $_columns = reset($data);
+    unset($data[key($data)]);
 
     if (!($columns = $this->getColumns())) {
       $columns = [];
@@ -55,7 +59,7 @@ class Importer
       }
     }
 
-    foreach ($data as $dataRow) {
+    foreach ($data as $rowNumber => $dataRow) {
       $row = [];
 
       for ($c = 0, $cn = count($columns); $c < $cn; $c++) {
@@ -63,6 +67,15 @@ class Importer
 
         $value = $dataRow[$letter] ?? $columns[$c]->default;
         $value = trim((string)$value);
+
+        // a date cell is read from its serial: its formatted value follows the cell's
+        // number format (Excel's built-in date format renders 03-05-24, month first)
+        if ('date' === $columns[$c]->type && isset($dataRow[$letter])) {
+          $cell = $sheet->getCell($letter . $rowNumber);
+          if (is_numeric($cell->getValue()) && Date::isDateTime($cell)) {
+            $value = Date::excelToDateTimeObject((float)$cell->getValue())->format('Y-m-d');
+          }
+        }
 
         switch ($columns[$c]->type) {
           case 'int':
@@ -118,7 +131,9 @@ class Importer
           $value = $m[3] . '-' . $m[2] . '-' . $m[1];
         } elseif (preg_match("/^(\d{2})-(\d{2})-(\d{4}).*$/", $value, $m)) {
           $value = $m[3] . '-' . $m[2] . '-' . $m[1];
-        } elseif (!preg_match("/^(\d{4})-(\d{2})-(\d{2}).*$/", $value)) {
+        } elseif (preg_match("/^(\d{4})-(\d{2})-(\d{2}).*$/", $value, $m)) {
+          $value = $m[1] . '-' . $m[2] . '-' . $m[3];
+        } else {
           $value = '';
         }
       }

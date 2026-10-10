@@ -13,6 +13,8 @@ use JDZ\Importer\Importer;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PHPUnit\Framework\TestCase;
 
 #[CoversClass(Importer::class)]
@@ -39,9 +41,18 @@ class ImporterTest extends TestCase
         $spreadsheet = new Spreadsheet();
         $spreadsheet->getActiveSheet()->fromArray($rows, null, 'A1');
 
-        $path = tempnam(sys_get_temp_dir(), 'jdzimp') . '.' . strtolower($format);
+        $path = $this->tmpPath(strtolower($format));
         IOFactory::createWriter($spreadsheet, $format)->save($path);
 
+        return $path;
+    }
+
+    /**
+     * A fresh temp path with that extension, removed in tearDown (tempnam() left its own file behind).
+     */
+    private function tmpPath(string $extension): string
+    {
+        $path = sys_get_temp_dir() . '/jdz-importer-' . uniqid('', true) . '.' . $extension;
         $this->tmpFiles[] = $path;
 
         return $path;
@@ -247,5 +258,84 @@ class ImporterTest extends TestCase
         $path = $this->sheetFile([['name', 'email']]);
 
         $this->assertSame([], (new Importer())->parse($path));
+    }
+
+
+    private static function dayImporter(): Importer
+    {
+        return new class extends Importer {
+            protected function getColumns(): array
+            {
+                return [
+                    (object)['field' => 'id'],
+                    (object)['field' => 'day', 'type' => 'date'],
+                ];
+            }
+        };
+    }
+
+    public static function excelDateFormats(): array
+    {
+        return [
+            'dd/mm/yyyy' => [NumberFormat::FORMAT_DATE_DDMMYYYY],
+            'yyyy-mm-dd' => [NumberFormat::FORMAT_DATE_YYYYMMDD],
+            'built-in 14 (mm-dd-yy), what Excel saves for a typed date' => [NumberFormat::FORMAT_DATE_XLSX14],
+            'with a time' => [NumberFormat::FORMAT_DATE_DATETIME],
+        ];
+    }
+
+    /**
+     * 5 March 2024 (day and month both <= 12, so a swap would go unnoticed otherwise).
+     */
+    #[DataProvider('excelDateFormats')]
+    public function testAnExcelDateCellIsReadAsAnIsoDate(string $formatCode): void
+    {
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->fromArray([['id', 'day'], ['1', 45356.5]], null, 'A1');
+        $sheet->getStyle('B2')->getNumberFormat()->setFormatCode($formatCode);
+
+        $path = $this->tmpPath('xlsx');
+        IOFactory::createWriter($spreadsheet, 'Xlsx')->save($path);
+
+        $this->assertSame('2024-03-05', self::dayImporter()->parse($path)[0]['day']);
+    }
+
+    public function testATypedDateKeepsTheDayOnlyWhateverItsTime(): void
+    {
+        $path = $this->sheetFile([
+            ['id', 'day'],
+            ['1', '05/03/2024 10:30'],
+            ['2', '05-03-2024 10:30'],
+            ['3', '2024-03-05 10:30:00'],
+        ]);
+
+        $this->assertSame(
+            ['2024-03-05', '2024-03-05', '2024-03-05'],
+            array_column(self::dayImporter()->parse($path), 'day')
+        );
+    }
+
+    public function testAnIntColumnCastsLikePhp(): void
+    {
+        $path = $this->sheetFile([
+            ['id', 'n'],
+            ['1', 'abc'],
+            ['2', '12abc'],
+            ['3', '3.9'],
+            ['4', '-2'],
+        ]);
+
+        $importer = new class extends Importer {
+            protected function getColumns(): array
+            {
+                return [
+                    (object)['field' => 'id'],
+                    (object)['field' => 'n', 'type' => 'int'],
+                ];
+            }
+        };
+
+        $this->assertSame([0, 12, 3, -2], array_column($importer->parse($path), 'n'));
     }
 }
