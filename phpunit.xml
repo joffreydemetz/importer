@@ -7,6 +7,9 @@
          requireCoverageMetadata="false"
          beStrictAboutCoverageMetadata="false"
          beStrictAboutOutputDuringTests="true"
+         displayDetailsOnPhpunitDeprecations="true"
+         displayDetailsOnTestsThatTriggerDeprecations="true"
+         displayDetailsOnTestsThatTriggerWarnings="true"
          failOnRisky="true"
          failOnWarning="true">
     <testsuites>
@@ -17,10 +20,7 @@
 
     <source>
         <include>
-            <directory suffix=".php">src</directory>
+            <directory>src</directory>
         </include>
-        <exclude>
-            <directory suffix=".php">vendor</directory>
-        </exclude>
     </source>
 </phpunit>
